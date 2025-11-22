@@ -1,3 +1,4 @@
+StringIO
 ee
 geemap
 pandas
