@@ -6,7 +6,7 @@ from utils import get_aoi_from_nuts, get_species_data, get_layer_information, ge
 
 st.set_page_config(layout="wide")
 
-geemap.ee_initialize(auth_mode='gcloud)
+geemap.ee_initialize(auth_mode='gcloud')
 
 st.title("GUI Toolbox")
 st.write("This is a simple GUI toolbox using Streamlit.")
@@ -76,6 +76,7 @@ if st.button("Click me"):
 if __name__ == "__main__":
 
     pass
+
 
 
 
