@@ -1,5 +1,6 @@
-pandas
-geopandas
-geemap
-ee
+pandas==2.2.3
+geopandas==1.0.1
+geemap==0.36.2
+ee==0.2
+
 
