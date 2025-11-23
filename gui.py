@@ -9,8 +9,8 @@ import ee
 import tempfile
 from utils import load_background_data, get_layer_information, get_aoi_from_nuts, get_species_data, get_layer_visualization_params, plot_correlation_heatmap, compute_sdm, plot_hier_clustering, initialize_gee, classify_image_aoi
 
-@st.cache_resource
-def reload_map_layer(selected_features, _country_aoi):
+@st.cache_data
+def load_map_layer(selected_features, country_code):
     for key, value in st.session_state.layer.items():
                 if key in st.session_state.features_select:
                     Map.addLayer(value.clip(country_aoi), get_layer_visualization_params(key), key, opacity=.5) 
@@ -96,7 +96,7 @@ with sdm_tab:
         Map = geemap.foliumap.Map()
         Map.add_basemap("SATELLITE")
         if "features_select" in st.session_state:
-            reload_map_layer(st.session_state.features_select, country_aoi)
+            load_map_layer(st.session_state.features_select, st.session_state.country_input)
         if "classified_img_pr" in st.session_state:
            Map.addLayer(st.session_state.classified_img_pr, {'min': 0, 'max': 1, 'palette': geemap.colormaps.palettes.viridis_r}, 'Habitat suitability')
         if st.session_state.species_gdf is not None:
