@@ -23,7 +23,6 @@ def initialize_gee():
             json.dump(service_account_info, f)
             f.flush()
             credentials = ee.ServiceAccountCredentials(service_account_info["client_email"], f.name)
-            # Use o project_id das credenciais para inicializar
             ee.Initialize(credentials, project=credentials.project_id)
             st.success("GEE initialization success.")
     except Exception as e:
