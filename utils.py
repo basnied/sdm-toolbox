@@ -291,7 +291,8 @@ def compute_sdm(species_gdf: gpd.GeoDataFrame=None, features: list=None, predict
     layer = get_layer_information(year)
     
     predictors = ee.Image.cat([layer[feature] for feature in features])
-    presence_gdf = geemap.ee_to_gdf(predictors.sampleRegions(collection=geemap.gdf_to_ee(species_gdf), geometries=True))
+    _ = predictors.sampleRegions(collection=geemap.gdf_to_ee(species_gdf), geometries=True)
+    presence_gdf = geemap.ee_to_gdf(_)
     
     background_gdf['PresAbs'] = 0
     presence_gdf['PresAbs'] = 1   
@@ -314,8 +315,6 @@ def compute_sdm(species_gdf: gpd.GeoDataFrame=None, features: list=None, predict
         results.append([roc_auc_score(y_test, rf.predict_proba(X_test)[:,1])] + rf.feature_importances_.tolist())
         
     results_df = pd.DataFrame(results, columns=['roc_auc'] + X.columns.tolist())
-
-    print(results_df['roc_auc'].mean())
     
     #partial dependence
     # from sklearn.inspection import PartialDependenceDisplay, permutation_importance
