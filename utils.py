@@ -200,7 +200,7 @@ def get_layer_information(year: int):
     terrain = ee.Algorithms.Terrain(ee.Image("USGS/SRTMGL1_003"))
     canopyHeight = ee.ImageCollection("projects/sat-io/open-datasets/facebook/meta-canopy-height").mosaic()
     layer= {
-            "CORINE Land Cover 2018" : ee.Image("COPERNICUS/CORINE/V20/100m/2018").select('landcover').rename("CORINE Land Cover 2018"),
+            "landcover" : ee.Image("COPERNICUS/CORINE/V20/100m/2018").select('landcover'),
             "elevation" : ee.Image("USGS/SRTMGL1_003").select('elevation'),
             "slope" : terrain.select('slope'),
             "aspect" : terrain.select('aspect'),
@@ -231,7 +231,6 @@ def get_layer_visualization_params(layer_name: str):
             "elevation": {"min": 0, "max": 4000, "palette": cm.palettes['terrain']},
             "slope": {"min": 0, "max": 60, "palette": cm.palettes['viridis']},
             "NDVI": {"min": -1, "max": 1, "palette": cm.palettes['RdYlGn']},
-            # "CORINE Land Cover 2018": {"min": 1, "max": 44, "palette": cm.palettes['tab20']},
             "CHM": {"min": 0, "max": 25, "palette": cm.palettes['viridis']},
             "Trees": {"min": 1, "max": 1, "palette": paletteTrees},
             "NARI": {"min": -1, "max": 1, "palette": cm.palettes['RdYlGn']},
@@ -296,6 +295,10 @@ def compute_sdm(species_gdf: gpd.GeoDataFrame=None, features: list=None, predict
     
     background_gdf['PresAbs'] = 0
     presence_gdf['PresAbs'] = 1   
+    
+    st.write(list(background_gdf.columns))
+    st.write(list(presence_gdf.columns))
+    st.write(features)
     
     presence_gdf = presence_gdf[background_gdf.columns]
 

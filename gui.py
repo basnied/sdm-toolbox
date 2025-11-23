@@ -60,7 +60,7 @@ with sdm_tab:
         st.multiselect(
             "Select Environmental Features",
             options=list(st.session_state.layer.keys()),
-            default=["CORINE Land Cover 2018"],
+            default=["landcover"],
             key="features_select"
         )
         
@@ -68,7 +68,7 @@ with sdm_tab:
             with st.spinner("Running SDM..."):
                 st.session_state.rf, st.session_state.results_df= compute_sdm(
                                                                                                                     species_gdf=st.session_state.species_gdf,
-                                                                                                                    features=st.session_state.features_select,
+                                                                                                                    features=list(st.session_state.features_select),
                                                                                                                     prediction_aoi=county_aoi,
                                                                                                                     model_type=st.session_state.model_input, 
                                                                                                                     n_trees=st.session_state.n_trees_input, 
