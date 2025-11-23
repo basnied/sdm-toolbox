@@ -274,8 +274,17 @@ def plot_correlation_heatmap(dataframe, h_size=10, show_labels=False):
     plt.show()
 
 @st.cache_data
-def load_background_data():
-    bg_df = pd.read_csv(r"./assets/background_data.csv", sep=',')
+def load_background_data(path=r"./assets/background_data.csv"):
+    """Loads background data from file.
+    The file is expected to be a CSV with a '.geo' column containing geometries in GeoJSON format.
+
+    Args:
+        path (pathlike|str, optional): _description_. Defaults to r"./assets/background_data.csv".
+
+    Returns:
+        gpd.GeoDataFrame: Returns a GeoDataFrame containing the background data.
+    """
+    bg_df = pd.read_csv(path, sep=',')
     s = bg_df['.geo'].astype(str).str.replace("'", '"').apply(json.loads)
     geoms = s.apply(shapely.geometry.shape)
     bg_gdf = gpd.GeoDataFrame(bg_df.drop(['.geo'], axis=1), geometry=geoms, crs='epsg:4326')
@@ -284,6 +293,24 @@ def load_background_data():
     
     
 def compute_sdm(species_gdf: gpd.GeoDataFrame=None, features: list=None, prediction_aoi: ee.Geometry=None, model_type: str="Random Forest", n_trees: int=100, tree_depth: int=5, train_size: float=0.7, year: int=2024):
+    """Trains a sdm.
+
+    Args:
+        species_gdf (gpd.GeoDataFrame, optional): _description_. Defaults to None.
+        features (list, optional): _description_. Defaults to None.
+        prediction_aoi (ee.Geometry, optional): _description_. Defaults to None.
+        model_type (str, optional): _description_. Defaults to "Random Forest".
+        n_trees (int, optional): _description_. Defaults to 100.
+        tree_depth (int, optional): _description_. Defaults to 5.
+        train_size (float, optional): _description_. Defaults to 0.7.
+        year (int, optional): _description_. Defaults to 2024.
+
+    Returns:
+        model (): The trained model.
+        results_df (pd.DataFrame): A dataframe with model performance metrics and feature importances.
+        ml_gdf (gpd.GeoDataFrame): Dataframe with presence and absence data.
+        predictors (ee.image): _description_
+    """
     from sklearn.metrics import r2_score, roc_auc_score
     from sklearn.model_selection import train_test_split, KFold, StratifiedKFold, StratifiedShuffleSplit, cross_val_score, GridSearchCV
     from sklearn.feature_selection import RFE, RFECV, SelectFromModel
@@ -335,8 +362,8 @@ def compute_sdm(species_gdf: gpd.GeoDataFrame=None, features: list=None, predict
     return model, results_df, ml_gdf, predictors
 
 def classify_image_aoi(image, aoi, ml_gdf, model, features):
-    if "classified_img_pr" in st.session_state:
-        del st.session_state.classified_img_pr
+    # if "classified_img_pr" in st.session_state:
+    #     del st.session_state.classified_img_pr
     fc = geemap.gdf_to_ee(ml_gdf)
     seed=random.randint(1,1000)
     tr_presence_points = fc.filter(ee.Filter.eq('PresAbs', 1)).randomColumn(seed=seed).sort("random")

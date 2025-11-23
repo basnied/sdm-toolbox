@@ -33,7 +33,7 @@ initialize_gee()
 st.title("SDM Plyaground")
 st.write("This is a simple SDM visualizer using Streamlit.")
 
-sdm_tab, stats_tab, extract_tab = st.tabs(["SDM", "Stats overview", "Extract"])
+sdm_tab, what_if, stats_tab, extract_tab = st.tabs(["SDM", "What if ...?", "Stats overview", "Extract"])
 
 with sdm_tab:
     st.header("Species Distribution Modeling (SDM)")
@@ -143,7 +143,56 @@ with sdm_tab:
             
             Map.to_streamlit()
 
+
+with what_if:
+    st.header("What if ...?")
+    st.write("Explore hypothetical scenarios by modifying environmental variables and observing their impact on species distribution predictions.")
+    st.write("This section is under development.")
+    if "predictors" not in st.session_state:
+        st.error("Run the SDM first to use the What-If analysis.")
+        
+    with st.form("whatif_form", border=False):
+        feature_col, value_col = st.columns(2, gap="medium")
+        with feature_col:
+            modify_feature = st.selectbox("Choose a feature to modify", options=st.session_state.features_select)
+        with value_col:
+            modify_value = st.number_input(f"Set new value for {modify_feature}", value=0.0)
+
+        # Fill each column with content
+            
+        if st.form_submit_button("Run What-If Analysis"):
+            st.session_state.future_value = st.session_state.predictors.select(modify_feature).add(ee.Image.constant(modify_value)).rename(modify_feature)
+            temp = st.session_state.features_select.copy()
+            temp.remove(modify_feature)
+            st.session_state.future_predictors = st.session_state.predictors.select(temp).addBands(st.session_state.future_value)
+            
+            st.session_state.classified_img__ftr_pr = classify_image_aoi(
+                        image=st.session_state.future_predictors,
+                        aoi=county_aoi,
+                        ml_gdf=st.session_state.ml_gdf,
+                        model=st.session_state.model,
+                        features=st.session_state.features_select
+                    )
+            st.session_state.change_layer = st.session_state.classified_img_pr.divide(st.session_state.classified_img__ftr_pr).rename('Change in Habitat Suitability')
+            st.success("What-If analysis completed.")
+            if "classified_img__ftr_pr" in st.session_state:
+                Map = geemap.foliumap.Map()
+                Map.add_basemap("SATELLITE")
+                Map.addLayer(st.session_state.classified_img__ftr_pr, {'min': 0, 'max': 1, 'palette': geemap.colormaps.palettes.viridis_r}, 'Future Habitat suitability')
+                Map.add_colorbar({'min': 0, 'max': 1, 'palette': geemap.colormaps.palettes.viridis_r}, label="Habitat suitability",
+                orientation="vertical",
+                position="bottomright",
+                layer_name="Habitat suitability")
+                Map.addLayer(st.session_state.classified_img_pr, {'min': 0, 'max': 1, 'palette': geemap.colormaps.palettes.viridis_r}, 'Habitat suitability')
     
+                Map.addLayer(st.session_state.change_layer, {'min': 0.5, 'max': 1.5, 'palette': ['green', 'yellow', 'red']}, 'Change in Habitat suitability')
+                Map.add_colorbar({'min': 0.5, 'max': 1.5, 'palette': ['green', 'yellow', 'red']}, label="Change in Habitat suitability",
+                        orientation="vertical",
+                        position="bottomright",
+                        layer_name="Change in Habitat suitability")
+                Map.addLayer(geemap.gdf_to_ee(st.session_state.species_gdf), {'color':'red'}, f"Species Observations {st.session_state.species_input}", shown=True)
+                Map.to_streamlit()
+  
 with stats_tab:
     with st.expander("Stats and Visualizations"):
         st.write("Statistical summaries and visualizations will be displayed here.")
