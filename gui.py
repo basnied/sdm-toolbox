@@ -57,7 +57,7 @@ with sdm_tab:
                     st.session_state.species_gdf = get_species_data(st.session_state.species_input, st.session_state.country_input) 
             
             st.multiselect(
-                    "Select Environmental Features",
+                    "Select Layer to display",
                     options=list(st.session_state.layer.keys()),
                     default=["landcover", "GHMI", "CHM"],
                     key="layers_select"
@@ -71,16 +71,15 @@ with sdm_tab:
             model_col, tree_col, tree_depth_col,  train_size_col = st.columns(4, gap="medium")
             with model_col:
                 st.selectbox('Select Model', options=["Random Forest", "Maxent", "Gradient Boost"], index=0, key="model_input")
-            if st.session_state.model_input in ["Random Forest", "Gradient Boost"]:
-                with tree_col:
-                    st.number_input('Number of Trees', min_value=10, max_value=500, value=100, step=10, key="n_trees_input")
-                with tree_depth_col:
-                    st.number_input('Max Tree Depth', min_value=1, max_value=50, value=3, step=1, key="tree_depth_input")
+            with tree_col:
+                st.number_input('Number of Trees (CART)', min_value=10, max_value=500, value=100, step=10, key="n_trees_input")
+            with tree_depth_col:
+                st.number_input('Max Tree Depth (CART)', min_value=1, max_value=50, value=3, step=1, key="tree_depth_input")
             with train_size_col:
                 st.number_input('Train Size (%)', min_value=50, max_value=90, value=75, step=5, key="train_size_input")  
             
             st.multiselect(
-                "Select Layer to display",
+                "Select Environmental Features",
                 options=list(st.session_state.layer.keys()),
                 default=['NDVI', 'aspect', 'b1', 'b12', 'CHM', 'GHMI', 'NARI', 'northness'],
                 key="features_select"
@@ -88,7 +87,7 @@ with sdm_tab:
             
             if st.form_submit_button("Run SDM"):
                 with st.spinner("Running SDM..."):
-                    st.session_state.rf, st.session_state.results_df, st.session_state.ml_gdf, st.session_state.predictors= compute_sdm(
+                    st.session_state.model, st.session_state.results_df, st.session_state.ml_gdf, st.session_state.predictors= compute_sdm(
                                                                                                                         species_gdf=st.session_state.species_gdf,
                                                                                                                         features=list(st.session_state.features_select),
                                                                                                                         prediction_aoi=county_aoi,
@@ -100,42 +99,47 @@ with sdm_tab:
                                                                                                                         )
                                 
                     st.success("SDM run completed. Results are displayed on the map below.")
-                    st.write("Model Performance Metrics:")
-                    st.table(st.session_state.results_df)
-                    if (rocauc_mean := st.session_state.results_df['roc_auc'].mean()) > .7:
-                        st.success("Mean ROC-AUC: {}".format(rocauc_mean))
-                    else:
-                        st.error("Mean ROC-AUC: {} < 0.7".format(rocauc_mean))
+                    try:
+                        st.write("Model Performance Metrics:")
+                        st.table(st.session_state.results_df)
+                        if (rocauc_mean := st.session_state.results_df['roc_auc'].mean()) > .7:
+                            st.success("Mean ROC-AUC: {}".format(rocauc_mean))
+                        else:
+                            st.error("Mean ROC-AUC: {} < 0.7".format(rocauc_mean))
+                    except:
+                        pass
                 
     
     
     with st.expander("Map View", expanded=True):
         if "country_input" in st.session_state:
             Map = load_map_layer(st.session_state.layers_select, st.session_state.country_input)
-            if "classified_img_pr" in st.session_state:
-                Map.addLayer(st.session_state.classified_img_pr, {'min': 0, 'max': 1, 'palette': geemap.colormaps.palettes.viridis_r}, 'Habitat suitability')
-                Map.add_colorbar({'min': 0, 'max': 1, 'palette': geemap.colormaps.palettes.viridis_r}, label="Habitat suitability",
-                                orientation="vertical",
-                                position="bottomright",
-                                layer_name="Habitat suitability")
-            if st.session_state.species_gdf is not None:
-                Map.addLayer(geemap.gdf_to_ee(st.session_state.species_gdf), {'color':'red'}, f"Species Observations {st.session_state.species_input}", shown=True)
-                Map.addLayer(geemap.gdf_to_ee(st.session_state.background_gdf), {'color':'blue'}, "Background data", shown=False)
-            if st.button("Show SDM Prediction") and "rf" in st.session_state:
+            
+            if st.button("Show SDM Prediction") and "model" in st.session_state:
                 with st.spinner("Classifying image..."):
-                    if "rf" in st.session_state:
+                    if "model" in st.session_state:
                         st.write("✅ Model found.")
                     else:
                         st.error("❌ Run the SDM first to see the prediction.")
+                    st.write("Sample presence size: {}, Sample pseudo-absence: {}".format(st.session_state.ml_gdf[st.session_state.ml_gdf.PresAbs==1].shape[0], st.session_state.ml_gdf[st.session_state.ml_gdf.PresAbs==0].shape[0]))
                     st.session_state.classified_img_pr = classify_image_aoi(
                         image=st.session_state.predictors,
                         aoi=county_aoi,
                         ml_gdf=st.session_state.ml_gdf,
-                        model=st.session_state.rf,
+                        model=st.session_state.model,
                         features=list(st.session_state.features_select)
                     )
                     st.success("Image classified.")
+            if "classified_img_pr" in st.session_state:
+                Map.addLayer(st.session_state.classified_img_pr, {'min': 0, 'max': 1, 'palette': geemap.colormaps.palettes.viridis_r}, 'Habitat suitability')
+                Map.add_colorbar({'min': 0, 'max': 1, 'palette': geemap.colormaps.palettes.viridis_r}, label="Habitat suitability",
+                orientation="vertical",
+                position="bottomright",
+                layer_name="Habitat suitability")
             
+            if st.session_state.species_gdf is not None:
+                Map.addLayer(geemap.gdf_to_ee(st.session_state.species_gdf), {'color':'red'}, f"Species Observations {st.session_state.species_input}", shown=True)
+                Map.addLayer(geemap.gdf_to_ee(st.session_state.background_gdf), {'color':'blue'}, "Background data", shown=False)
             
             Map.to_streamlit()
 

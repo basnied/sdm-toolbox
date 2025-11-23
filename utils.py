@@ -10,6 +10,7 @@ import pandas as pd
 import geopandas as gpd
 import geemap
 import shapely
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
@@ -129,7 +130,7 @@ def get_era5_snowcover(date, poi):
         collection = poi,
         properties = ['name', 'datetime']
 )
-
+@st.cache_data
 def get_species_data(species_name, country_code, database = 'gbif'):
     """
     Retrieves observational data for a specific species using the GBIF API and returns it as a pandas DataFrame.
@@ -272,6 +273,7 @@ def plot_correlation_heatmap(dataframe, h_size=10, show_labels=False):
     plt.savefig('correlation_heatmap_plot.png')
     plt.show()
 
+@st.cache_data
 def load_background_data():
     bg_df = pd.read_csv(r"./assets/background_data.csv", sep=',')
     s = bg_df['.geo'].astype(str).str.replace("'", '"').apply(json.loads)
@@ -282,12 +284,14 @@ def load_background_data():
     
     
 def compute_sdm(species_gdf: gpd.GeoDataFrame=None, features: list=None, prediction_aoi: ee.Geometry=None, model_type: str="Random Forest", n_trees: int=100, tree_depth: int=5, train_size: float=0.7, year: int=2024):
-    from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
     from sklearn.metrics import r2_score, roc_auc_score
     from sklearn.model_selection import train_test_split, KFold, StratifiedKFold, StratifiedShuffleSplit, cross_val_score, GridSearchCV
     from sklearn.feature_selection import RFE, RFECV, SelectFromModel
     
-    background_gdf = load_background_data()[features+['geometry']].sample(n=species_gdf.shape[0], axis=0)
+    if model_type== "Maxent":
+        background_gdf = load_background_data()[features+['geometry']]
+    else:
+        background_gdf = load_background_data()[features+['geometry']]
     layer = get_layer_information(year)
     
     predictors = ee.Image.cat([layer[feature] for feature in features])
@@ -304,17 +308,20 @@ def compute_sdm(species_gdf: gpd.GeoDataFrame=None, features: list=None, predict
     y = ml_gdf['PresAbs']
     X = ml_gdf[features]
    
+    match model_type:
+        case "Random Forest":
+            results = []
 
-    results = []
-
-    for i in range(10):
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=train_size, stratify=y, shuffle=True)
-        rf = RandomForestClassifier(n_estimators=n_trees, max_samples=0.8, min_samples_leaf=.1, verbose=0, class_weight='balanced', max_depth=tree_depth)
-        rf.fit(X_train, y_train)
-        results.append([roc_auc_score(y_test, rf.predict_proba(X_test)[:,1])] + rf.feature_importances_.tolist())
-        
-    results_df = pd.DataFrame(results, columns=['roc_auc'] + X.columns.tolist())
-    
+            for i in range(10):
+                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=train_size, stratify=y, shuffle=True)
+                model = RandomForestClassifier(n_estimators=n_trees, max_samples=0.8, min_samples_leaf=.1, verbose=0, class_weight='balanced', max_depth=tree_depth)
+                model.fit(X_train, y_train)
+                results.append([roc_auc_score(y_test, model.predict_proba(X_test)[:,1])] + model.feature_importances_.tolist())
+                
+                results_df = pd.DataFrame(results, columns=['roc_auc'] + X.columns.tolist())
+        case "Maxent":
+            model = "Maxent"
+            results_df = pd.DataFrame()
     #partial dependence
     # from sklearn.inspection import PartialDependenceDisplay, permutation_importance
 
@@ -325,32 +332,42 @@ def compute_sdm(species_gdf: gpd.GeoDataFrame=None, features: list=None, predict
     # PartialDependenceDisplay.from_estimator(
     #     rf, X_train, features=X.columns.to_list(), kind='average', ax=ax
     # )
-    return rf, results_df, ml_gdf, predictors
+    return model, results_df, ml_gdf, predictors
 
 def classify_image_aoi(image, aoi, ml_gdf, model, features):
+    if "classified_img_pr" in st.session_state:
+        del st.session_state.classified_img_pr
     fc = geemap.gdf_to_ee(ml_gdf)
     seed=random.randint(1,1000)
     tr_presence_points = fc.filter(ee.Filter.eq('PresAbs', 1)).randomColumn(seed=seed).sort("random")
     tr_pseudo_abs_points = fc.filter(ee.Filter.eq('PresAbs', 0)).randomColumn(seed=seed).sort("random").limit(tr_presence_points.size().getInfo())
     train_pvals = tr_presence_points.merge(tr_pseudo_abs_points)
-
-    # Random Forest classifier
-    classifier = ee.Classifier.smileRandomForest(
-        seed=seed,
-        numberOfTrees=model.get_params()['n_estimators'],
-        maxNodes=model.get_params()['max_depth'],
-        # shrinkage=0.1, # gradient
-        # variablesPerSplit=None,
-        minLeafPopulation=round(train_pvals.size().getInfo()*.1, 0),#rf
-        bagFraction=0.8, # rf
-    )
-    # Presence probability: Habitat suitability map
-    classifier_pr = classifier.setOutputMode("PROBABILITY").train(
-        train_pvals, "PresAbs", features
-    )
-    classified_img_pr = image.clip(aoi).classify(classifier_pr)
+    if isinstance(model, RandomForestClassifier):
+        # Random Forest classifier
+        classifier = ee.Classifier.smileRandomForest(
+            seed=seed,
+            numberOfTrees=model.n_estimators,
+            maxNodes=model.max_depth,
+            # shrinkage=0.1, # gradient
+            # variablesPerSplit=None,
+            minLeafPopulation=round(train_pvals.size().getInfo()*.1, 0),#rf
+            bagFraction=0.8, # rf
+        )
+        classifier_pr = classifier.setOutputMode("PROBABILITY").train(
+            train_pvals, "PresAbs", features
+        )
+        classified_img_pr = image.clip(aoi).classify(classifier_pr)
+        return classified_img_pr
+       
+    else:
+        classifier = ee.Classifier.amnhMaxent()
     
-    return classified_img_pr
+        # Presence probability: Habitat suitability map
+        classifier_pr = classifier.train(
+            train_pvals, "PresAbs", features
+        )
+        classified_img_pr = image.clip(aoi).classify(classifier_pr)
+        return classified_img_pr.select('probability')
     
     
 def plot_hier_clustering(dataframe):
