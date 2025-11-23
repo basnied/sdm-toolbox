@@ -200,7 +200,7 @@ def get_layer_information(year: int):
     terrain = ee.Algorithms.Terrain(ee.Image("USGS/SRTMGL1_003"))
     canopyHeight = ee.ImageCollection("projects/sat-io/open-datasets/facebook/meta-canopy-height").mosaic()
     layer= {
-            "CORINE Land Cover 2018" : ee.Image("COPERNICUS/CORINE/V20/100m/2018").select('landcover'),
+            "CORINE Land Cover 2018" : ee.Image("COPERNICUS/CORINE/V20/100m/2018").select('landcover').rename("CORINE Land Cover 2018"),
             "elevation" : ee.Image("USGS/SRTMGL1_003").select('elevation'),
             "slope" : terrain.select('slope'),
             "aspect" : terrain.select('aspect'),
@@ -288,7 +288,7 @@ def compute_sdm(species_gdf: gpd.GeoDataFrame=None, features: list=None, predict
     from sklearn.model_selection import train_test_split, KFold, StratifiedKFold, StratifiedShuffleSplit, cross_val_score, GridSearchCV
     from sklearn.feature_selection import RFE, RFECV, SelectFromModel
     
-    background_gdf = load_background_data()
+    background_gdf = load_background_data()[features+['geometry']]
     layer = get_layer_information(year)
     
     predictors = ee.Image.cat([layer[feature] for feature in features])
