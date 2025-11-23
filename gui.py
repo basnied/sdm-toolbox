@@ -2,7 +2,6 @@ import streamlit as st
 import json
 from io import StringIO
 import geemap.foliumap as geemap
-import geemap.colormaps as cm
 import pandas as pd
 import geopandas as gpd
 import ee
@@ -101,7 +100,7 @@ with sdm_tab:
                 Map.addLayer(ee.Image().byte().paint(featureCollection=country_aoi, color=1, width=2), {'palette': 'FF0000'}, "Country AOI", opacity=1)
                 Map.centerObject(country_aoi, 6)
         if "classified_img_pr" in st.session_state:
-            Map.addLayer(st.session_state.classified_img_pr, {'min': 0, 'max': 1, 'palette': cm.palettes.viridis_r}, 'Habitat suitability')
+            Map.addLayer(st.session_state.classified_img_pr, {'min': 0, 'max': 1, 'palette': geemap.colormaps.palettes.viridis_r}, 'Habitat suitability')
         if st.session_state.species_gdf is not None:
             Map.addLayer(geemap.gdf_to_ee(st.session_state.species_gdf), {'color':'red'}, "Species Observations", shown=True)
             Map.addLayer(geemap.gdf_to_ee(st.session_state.background_gdf), {'color':'blue'}, "Background data", shown=False)
