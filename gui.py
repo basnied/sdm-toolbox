@@ -7,7 +7,7 @@ import pandas as pd
 import geopandas as gpd
 import ee
 import tempfile
-from utils import load_background_data, get_layer_information, get_aoi_from_nuts, get_species_data, get_layer_visualization_params, plot_correlation_heatmap, compute_sdm, plot_hier_clustering, initialize_gee, classify_image_aoi, get_index_info, get_species_features
+from utils import *
 
 @st.cache_data
 def load_map_layer(layers, country_code):
@@ -16,7 +16,11 @@ def load_map_layer(layers, country_code):
     for key, value in st.session_state.layer.items():
         if key in layers:
             Map.addLayer(value.clip(st.session_state.country_aoi), get_layer_visualization_params(key), key, opacity=.5) 
-            Map.addLayer(ee.Image().byte().paint(featureCollection=st.session_state.country_aoi, color=1, width=2), {'palette': 'FF0000'}, "Country AOI", opacity=1)
+            Map.addLayer(ee.Image().byte().paint(
+                featureCollection=st.session_state.country_aoi,
+                color=1, width=2),
+                         {'palette': 'FF0000'}, "Country AOI",
+                         opacity=1)
             Map.centerObject(st.session_state.country_aoi, 6)
         
     return Map
@@ -33,7 +37,8 @@ initialize_gee()
 st.title("SDM Plyaground")
 st.write("This is a simple SDM visualizer using Streamlit.")
 
-sdm_tab, what_if, stats_tab, extract_tab, faq_tab = st.tabs(["SDM", "What if ...?", "Stats overview", "Extract", "FAQ"])
+sdm_tab, what_if, stats_tab, extract_tab, faq_tab =\
+    st.tabs(["SDM", "What if ...?", "Stats overview", "Extract", "FAQ"])
 
 with sdm_tab:
     st.header("Species Distribution Modeling (SDM)")
