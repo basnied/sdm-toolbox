@@ -1,5 +1,5 @@
 import streamlit as st
-import json
+from pathlib import Path
 from io import StringIO
 import geemap.foliumap
 import geemap
@@ -75,7 +75,7 @@ with sdm_tab:
                 with st.form("sdm_form", border=False):
                     model_col, tree_col, tree_depth_col,  train_size_col = st.columns(4, gap="medium")
                     with model_col:
-                        st.selectbox('Select Model', options=["Random Forest", "Maxent", "Gradient Boost"], index=0, key="model_input")
+                        st.selectbox('Select Model', options=["Random Forest", "Maxent", "Embedding"], index=0, key="model_input")
                     with tree_col:
                         st.number_input('Number of Trees (CART)', min_value=10, max_value=500, value=100, step=10, key="n_trees_input")
                     with tree_depth_col:
@@ -91,7 +91,13 @@ with sdm_tab:
                     )
                     
                     if st.form_submit_button("Run SDM"):
-                        st.session_state.presence_gdf, st.session_state.predictors = get_species_features(_species_gdf=st.session_state.species_gdf, features=list(st.session_state.features_select), _layer=st.session_state.layer)
+                        if "presence_gdf" in st.session_state:
+                            try:
+                                st.session_state.presence_gdf = st.session_state.presence_gdf[st.session_state.features_select + ['geometry']]
+                            except:
+                                st.session_state.presence_gdf, st.session_state.predictors = get_species_features(_species_gdf=st.session_state.species_gdf, features=list(st.session_state.features_select), _layer=st.session_state.layer)
+                        else:
+                            st.session_state.presence_gdf, st.session_state.predictors = get_species_features(_species_gdf=st.session_state.species_gdf, features=list(st.session_state.features_select), _layer=st.session_state.layer)
                         
                         with st.spinner("Running SDM..."):
                             st.session_state.model, st.session_state.results_df, st.session_state.ml_gdf = compute_sdm(
@@ -152,7 +158,14 @@ with sdm_tab:
                     orientation="vertical",
                     position="bottomright",
                     layer_name="Habitat suitability")
-                
+                    Map.addLayer(geemap.gdf_to_ee(st.session_state.ml_gdf[st.session_state.ml_gdf.PresAbs==0]), {'color':'orange'}, "Used background data points", shown=False)
+                    if st.button(label="Download Prediction GeoTIFF"):
+                        geemap.ee_export_image(
+                            ee_object=st.session_state.classified_img_pr,
+                            region=st.session_state.classified_img_pr.geometry(),
+                            scale=90,
+                            filename=Path.home() / f'Downloads/SDM_Prediction_{st.session_state.species_input}_{st.session_state.county_input}_{st.session_state.year_input}.tif'
+                        )                    
                 if st.session_state.species_gdf is not None:
                     Map.addLayer(geemap.gdf_to_ee(st.session_state.species_gdf), {'color':'red'}, f"Species Observations {st.session_state.species_input}", shown=True)
                     Map.addLayer(geemap.gdf_to_ee(st.session_state.background_gdf), {'color':'blue'}, "Background data", shown=False)

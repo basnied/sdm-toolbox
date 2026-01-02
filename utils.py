@@ -353,6 +353,18 @@ def compute_sdm(presence: gpd.GeoDataFrame=None, background: gpd.GeoDataFrame=No
         case "Maxent":
             model = "Maxent"
             results_df = pd.DataFrame()
+        case "Embedding":
+            model = "Embedding"
+            embeddings = ee.ImageCollection('GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL');
+            mosaic = (embeddings
+                .filter(ee.Filter.date('2024-01-01', '2025-01-01'))
+                .mosaic())
+            results_df = pd.DataFrame()
+            # results_df = mosaic.sampleRegions(
+            #     collection= geemap.gdf_to_ee(ml_gdf),
+            #     properties = ['PresAbs'],
+            #     scale= 30
+            # )
     #partial dependence
     # from sklearn.inspection import PartialDependenceDisplay, permutation_importance
 
@@ -387,19 +399,49 @@ def classify_image_aoi(image, aoi, ml_gdf, model, features):
         classifier_pr = classifier.setOutputMode("PROBABILITY").train(
             train_pvals, "PresAbs", features
         )
-        classified_img_pr = image.clip(aoi).classify(classifier_pr)
+        classified_img_pr = image.reproject(crs='EPSG:4326', scale=30).clip(aoi).classify(classifier_pr)
         return classified_img_pr
        
-    else:
+    if model == "Maxent":
         classifier = ee.Classifier.amnhMaxent()
     
         # Presence probability: Habitat suitability map
         classifier_pr = classifier.train(
             train_pvals, "PresAbs", features
         )
-        classified_img_pr = image.clip(aoi).classify(classifier_pr)
+        classified_img_pr = image.reproject(crs='EPSG:4326', scale=30).clip(aoi).classify(classifier_pr)
         return classified_img_pr.select('probability')
-    
+    if model == "Embedding":
+        embeddings = ee.ImageCollection('GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL');
+        mosaic = (embeddings
+                .filter(ee.Filter.date('2024-01-01', '2025-01-01'))
+                .mosaic())
+        sampleEmbeddings = mosaic.sampleRegions(
+                collection= geemap.gdf_to_ee(ml_gdf),
+                properties = ['PresAbs'],
+                scale= 30
+            )
+        tr_presence_points = sampleEmbeddings.filter(ee.Filter.eq('PresAbs', 1))
+        tr_pseudo_abs_points = sampleEmbeddings.filter(ee.Filter.eq('PresAbs', 0))
+        train_pvals = tr_presence_points.merge(tr_pseudo_abs_points)
+
+        # Random Forest classifier
+        classifier = ee.Classifier.smileRandomForest(
+            seed=seed,
+            numberOfTrees=500,
+            maxNodes=5,
+            # shrinkage=0.1, # gradient
+            # variablesPerSplit=None,
+            minLeafPopulation=round(train_pvals.size().getInfo()*.1, 0),#rf
+            bagFraction=0.8, # rf
+        )
+        # Presence probability: Habitat suitability map
+        classifier_pr = classifier.setOutputMode("PROBABILITY").train(
+            train_pvals, "PresAbs", mosaic.bandNames()
+        )
+        classified_img_pr = mosaic.clip(aoi).classify(classifier_pr)
+        return classified_img_pr
+
     
 def plot_hier_clustering(dataframe):
     from scipy.cluster import hierarchy
