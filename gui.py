@@ -95,20 +95,22 @@ with sdm_tab:
                             try:
                                 st.session_state.presence_gdf = st.session_state.presence_gdf[st.session_state.features_select + ['geometry']]
                             except:
-                                st.session_state.presence_gdf, st.session_state.predictors = get_species_features(_species_gdf=st.session_state.species_gdf, features=list(st.session_state.features_select), _layer=st.session_state.layer)
+                                st.session_state.presence_gdf, st.session_state.predictors = get_species_features(
+                                    _species_gdf=st.session_state.species_gdf, features=list(st.session_state.features_select), _layer=st.session_state.layer)
                         else:
-                            st.session_state.presence_gdf, st.session_state.predictors = get_species_features(_species_gdf=st.session_state.species_gdf, features=list(st.session_state.features_select), _layer=st.session_state.layer)
+                            st.session_state.presence_gdf, st.session_state.predictors = get_species_features(
+                                _species_gdf=st.session_state.species_gdf, features=list(st.session_state.features_select), _layer=st.session_state.layer)
                         
                         with st.spinner("Running SDM..."):
                             st.session_state.model, st.session_state.results_df, st.session_state.ml_gdf = compute_sdm(
-                                                                                                                        presence=st.session_state.presence_gdf,
-                                                                                                                        background=st.session_state.background_gdf,
-                                                                                                                        features=list(st.session_state.features_select),
-                                                                                                                        model_type=st.session_state.model_input, 
-                                                                                                                        n_trees=st.session_state.n_trees_input, 
-                                                                                                                        tree_depth=st.session_state.tree_depth_input, 
-                                                                                                                        train_size=st.session_state.train_size_input/100, 
-                                                                                                                        )
+                                presence=st.session_state.presence_gdf,
+                                background=st.session_state.background_gdf,
+                                features=list(st.session_state.features_select),
+                                model_type=st.session_state.model_input, 
+                                n_trees=st.session_state.n_trees_input, 
+                                tree_depth=st.session_state.tree_depth_input, 
+                                train_size=st.session_state.train_size_input/100, 
+                                )
                                         
                             st.success("SDM run completed. Results are displayed on the map below.")
                             try:

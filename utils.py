@@ -1,6 +1,4 @@
 import math
-import os
-from io import StringIO
 import tempfile
 import json
 import random
@@ -10,78 +8,127 @@ import pandas as pd
 import geopandas as gpd
 import geemap
 import shapely
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.ensemble import RandomForestClassifier
 import matplotlib.pyplot as plt
 import numpy as np
-import sys
 import ee
+
 
 @st.cache_resource
 def initialize_gee():
+    """Intitialize Google Earth Engine with service account credentials
+    for web app.
+    """
     try:
         service_account_info = dict(st.secrets["earthengine"])
-        with tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as f:
+        with tempfile.NamedTemporaryFile(
+                mode='w+', suffix='.json', delete=False) as f:
             json.dump(service_account_info, f)
             f.flush()
-            credentials = ee.ServiceAccountCredentials(service_account_info["client_email"], f.name)
+            credentials = ee.ServiceAccountCredentials(
+                service_account_info["client_email"], f.name)
             ee.Initialize(credentials, project=credentials.project_id)
-            st.success("GEE initialization success.")
     except Exception as e:
-        st.error("Error when intializing Google Earth Engine. Verify credentials in st.secrets.")
+        st.error("Error when intializing Google Earth Engine. \
+                 Verify credentials in st.secrets.")
         st.error(f"Error details: {e}")
         st.stop()
 
+
 def mask_s2_clouds(image):
-  """Masks clouds in a Sentinel-2 image using the QA band.
+    """Masks clouds in a Sentinel-2 image using the QA band.
 
-  Args:
-      image (ee.Image): A Sentinel-2 image.
+    Parameters
+    ----------
+        image (ee.Image): A Sentinel-2 image.
 
-  Returns:
-      ee.Image: A cloud-masked Sentinel-2 image.
-  """
-  qa = image.select('QA60')
+    Returns
+    -------
+        ee.Image: A cloud-masked Sentinel-2 image.
+        """
+    qa = image.select('QA60')
 
-  # Bits 10 and 11 are clouds and cirrus, respectively.
-  cloud_bit_mask = 1 << 10
-  cirrus_bit_mask = 1 << 11
+    # Bits 10 and 11 are clouds and cirrus, respectively.
+    cloud_bit_mask = 1 << 10
+    cirrus_bit_mask = 1 << 11
 
-  # Both flags should be set to zero, indicating clear conditions.
-  mask = (
-      qa.bitwiseAnd(cloud_bit_mask)
-      .eq(0)
-      .And(qa.bitwiseAnd(cirrus_bit_mask).eq(0))
-  )
+    # Both flags should be set to zero, indicating clear conditions.
+    mask = (
+        qa.bitwiseAnd(cloud_bit_mask)
+        .eq(0)
+        .And(qa.bitwiseAnd(cirrus_bit_mask).eq(0))
+    )
 
-  return image.updateMask(mask).divide(10000)
+    return image.updateMask(mask).divide(10000)
 
-
-# Calculate Index
-
-#Nari
 
 def calculate_nari(img):
+    """Calcultate Near Reflectance Index from Earth Engine Image.
+
+    Parameters
+    ----------
+    img : ee.Image
+        An Iamge containing Green and Red Edge 2 bands.
+
+    Returns
+    -------
+    nari: ee.Image
+        An Image containing the Nari index.
+    """
     green = img.select('B3')
     red_edge_1 = img.select('B5')
-    nari = ((ee.Image.constant(1).divide(green)).subtract(ee.Image.constant(1).divide(red_edge_1))).divide((ee.Image.constant(1).divide(green)).add(ee.Image.constant(1).divide(red_edge_1)))
+    nari = (((ee.Image.constant(1).divide(green))
+            .subtract(ee.Image.constant(1).divide(red_edge_1)))
+            .divide((ee.Image.constant(1).divide(green))
+                    .add(ee.Image.constant(1).divide(red_edge_1))))
     return nari
 
-# Ncri
 
 def calculate_ncri(img):
+    """Calcultate Near Reflectance Index from Earth Engine Image.
+
+    Parameters
+    ----------
+    img : ee.Image
+        An Iamge containing Green and Red Edge 2 bands.
+
+    Returns
+    -------
+    nari: ee.Image
+        An Image containing the NCRI index.
+    """
     red_edge_1 = img.select('B5')
     red_edge_3 = img.select('B7')
-    ncri = ((ee.Image.constant(1).divide(red_edge_1)).subtract(ee.Image.constant(1).divide(red_edge_3))).divide((ee.Image.constant(1).divide(red_edge_1)).add(ee.Image.constant(1).divide(red_edge_3)))
+    ncri = (((ee.Image.constant(1).divide(red_edge_1))
+             .subtract(ee.Image.constant(1).divide(red_edge_3)))
+            .divide((ee.Image.constant(1).divide(red_edge_1))
+                    .add(ee.Image.constant(1).divide(red_edge_3))))
     return ncri
 
-def gee_calculate_scrub_index(index: str=None, year: int=None):
+
+def gee_calculate_scrub_index(index: str = None, year: int = None):
+    """Calculate the NARI or NCRI.
+
+    Parameters
+    ----------
+    index : str, optional
+        One of 'nari' or 'ncri', by default None
+    year : int, optional
+        Year to calculate the index for, by default None
+
+    Returns
+    -------
+    ee.Image
+        Image containing the requested index.
+    """
+
     sentinel = (ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
                 .filterDate(f'{year}-09-01', f'{year}-11-01')
                 .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 65))
                 .map(mask_s2_clouds)
                 .select(['B3', 'B5', 'B7'])
-    )
-    if index =='nari':
+                )
+    if index == 'nari':
         nari = sentinel.map(calculate_nari)
         return nari.median()
     elif index == 'ncri':
@@ -89,20 +136,50 @@ def gee_calculate_scrub_index(index: str=None, year: int=None):
         return ncri.median()
     else:
         print('ERROR. No layer returned')
-        
-def calculate_ndvi(year: int=None):
+
+
+def calculate_ndvi(year: int = None):
+    """Calcultate Normalized Difference Vegetation Index
+    from Earth Engine Image.
+
+    Parameters
+    ----------
+    img : ee.Image
+        An Iamge containing Red and NIR bands.
+
+    Returns
+    -------
+    nari: ee.Image
+        An Image containing the Nari index.
+    """
     sentinel = (ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
-                .filterDate(f'{year}-01-01', f'{year+1}-01-01')
+                .filterDate(f'{year}-01-01', f'{year + 1}-01-01')
                 .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 65))
                 .map(mask_s2_clouds)
                 .select(['B3', 'B5', 'B7'])
-    )
+                )
     red = sentinel.select('B4')
     nir = sentinel.select('B8')
     ndvi = (red.subtract(nir)).divide(red.add(nir)).mean()
-    return ndvi       
+    return ndvi
+
 
 def get_era5_snowfall(date, poi):
+    """Get the aggregated snowfall of the last 4 days for a given date
+    and Point of Interest.
+
+    Parameters
+    ----------
+    date : str
+        Date in 'YYYY-MM-DD' fomrat
+    poi : ee.FeatureCollection
+        A FeatureCollection containing the Points of Interest.
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
     window_end = ee.Date(date)
     window_start = window_end.advance(ee.Number(-4), 'days')
     era5 = (
@@ -113,11 +190,27 @@ def get_era5_snowfall(date, poi):
             .multiply(1000)
         )
     return era5.sampleRegions(
-        collection = poi,
-        properties = ['name', 'datetime']
-    )
+        collection=poi,
+        properties=['name', 'datetime']
+        )
+
 
 def get_era5_snowcover(date, poi):
+    """Get the aggregated snow cover of the last 4 days for a given date
+    and Point of Interest.
+
+    Parameters
+    ----------
+    date : str
+        Date in 'YYYY-MM-DD' fomrat
+    poi : ee.FeatureCollection
+        A FeatureCollection containing the Points of Interest.
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
     window_end = ee.Date(date)
     window_start = window_end.advance(ee.Number(-4), 'days')
     era5 = (
@@ -127,26 +220,38 @@ def get_era5_snowcover(date, poi):
             .mean()
         )
     return era5.sampleRegions(
-        collection = poi,
-        properties = ['name', 'datetime']
-)
+        collection=poi,
+        properties=['name', 'datetime']
+        )
+
+
 @st.cache_data
-def get_species_data(species_name, country_code, database = 'gbif'):
+def get_species_data(species_name, country_code, database: str = 'gbif'):
     """
-    Retrieves observational data for a specific species using the GBIF API and returns it as a pandas DataFrame.
+    Retrieves observational data for a specific species using the
+    GBIF API and returns it as a pandas DataFrame.
 
-    Parameters:
-    species_name (str): The scientific name of the species to query.
-    country_code (str): The country code of the where the observation data will be queried.
+    Parameters
+    ----------
+        species_name : str
+            The scientific name of the species to query.
+        country_code : str
+            Country code where the observation data will be queried.
 
-    Returns:
-    pd.DataFrame: A pandas DataFrame containing the observational data.
+    Returns
+    -------
+        pd.DataFrame
+            A pandas DataFrame containing the observational data.
     """
-    if(database == 'iNaturalist'): user_id = input('Type in User-ID: ')
-    
+    if(database == 'iNaturalist'):
+        user_id = input('Type in User-ID: ')
+
     match database:
-        case 'gbif': base_url = "https://api.gbif.org/v1/occurrence/search"
-        case 'iNaturalist': base_url = f"https://api.inaturalist.org/v1/observations?user_id={user_id}&quality_grade=needs_id&rank=genus"
+        case 'gbif': base_url = \
+            "https://api.gbif.org/v1/occurrence/search"
+        case 'iNaturalist': base_url = (
+            "https://api.inaturalist.org/v1/observations?"
+            f"user_id={user_id}&quality_grade=needs_id&rank=genus")
     params = {
         "scientificName": species_name,
         "country": country_code,
@@ -157,7 +262,7 @@ def get_species_data(species_name, country_code, database = 'gbif'):
 
     try:
         response = requests.get(base_url, params=params)
-        response.raise_for_status()  # Raises an exception for a response error.
+        response.raise_for_status()
         data = response.json()
         occurrences = data.get("results", [])
 
@@ -165,28 +270,54 @@ def get_species_data(species_name, country_code, database = 'gbif'):
             df = pd.json_normalize(occurrences)
             return gpd.GeoDataFrame(
                 df,
-                geometry=gpd.points_from_xy(df.decimalLongitude, df.decimalLatitude), crs="EPSG:4326")[["species", "year", "month", "geometry"]]
+                geometry=gpd.points_from_xy(df.decimalLongitude,
+                    df.decimalLatitude), crs="EPSG:4326"
+                )[["species", "year", "month", "geometry"]]
         else:
-            print("No data found for the given species and country code.")
-            return None  # Returns an empty DataFrame
+            print("No data found for the given species"
+                  "and country code.")
+            return None
     except requests.RequestException as e:
         print(f"Request failed: {e}")
-        return None  # Returns an empty DataFrame in case of an exception
-    
+        return None  
+
+ 
 def remove_duplicates(data, grain_size, aoi):
+    """Remove duplicate georefernced points from data within
+    an Area of Interest and a given resolution.
+
+    Parameters
+    ----------
+    data : _type_
+        _description_
+    grain_size : _type_
+        _description_
+    aoi : _type_
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
     # Select one occurrence record per pixel at the chosen spatial resolution
-    random_raster = ee.Image.random().reproject("EPSG:4326", None, grain_size).clip(aoi)
+    random_raster = ee.Image.random().reproject("EPSG:4326", None,
+                                                grain_size).clip(aoi)
     rand_point_vals = random_raster.sampleRegions(
         collection=ee.FeatureCollection(data), geometries=True
     )
     return rand_point_vals.distinct("random")
 
 def get_aoi_from_nuts(country_code:str = "AT", county_name:str=None):
-    NUTS_0 = gpd.read_file(r"./assets/NUTS_RG_01M_2024_4326_LEVL_0.geojson")
-    NUTS_2 = gpd.read_file(r"./assets/NUTS_RG_01M_2024_4326_LEVL_2.geojson")
-    country = geemap.gdf_to_ee(NUTS_0.loc[NUTS_0.CNTR_CODE==country_code])
+    NUTS_0 = gpd.read_file(
+        r"./assets/NUTS_RG_01M_2024_4326_LEVL_0.geojson")
+    NUTS_2 = gpd.read_file(
+        r"./assets/NUTS_RG_01M_2024_4326_LEVL_2.geojson")
+    country = geemap.gdf_to_ee(
+        NUTS_0.loc[NUTS_0.CNTR_CODE == country_code])
     if county_name:
-        county = geemap.gdf_to_ee(NUTS_2.loc[NUTS_2.NUTS_NAME==county_name])  
+        county = geemap.gdf_to_ee(
+            NUTS_2.loc[NUTS_2.NUTS_NAME == county_name])  
     else:
         county = None
     
@@ -197,7 +328,8 @@ def get_layer_information(year: int):
             ee.ImageCollection('ECMWF/ERA5_LAND/HOURLY')
             .filter(ee.Filter.date(f"{year}-01-01", f"{year+1}-01-01"))
             )
-    BIOCLIM = {key: ee.Image("projects/ee-sebasd1991/assets/BioClim").select(key) for key in ee.Image("projects/ee-sebasd1991/assets/BioClim").bandNames().getInfo()}
+    BIOCLIM = {key: (ee.Image("projects/ee-sebasd1991/assets/BioClim")
+               .select(key)) for key in ee.Image("projects/ee-sebasd1991/assets/BioClim").bandNames().getInfo()}
     terrain = ee.Algorithms.Terrain(ee.Image("USGS/SRTMGL1_003"))
     canopyHeight = ee.ImageCollection("projects/sat-io/open-datasets/facebook/meta-canopy-height").mosaic()
     layer= {
@@ -301,23 +433,29 @@ def get_species_features(_species_gdf: gpd.GeoDataFrame=None, features: list=Non
         return presence_gdf, predictors
     
 def compute_sdm(presence: gpd.GeoDataFrame=None, background: gpd.GeoDataFrame=None, features: list=None, model_type: str="Random Forest", n_trees: int=100, tree_depth: int=5, train_size: float=0.7):
-    """Trains a sdm.
+    """_summary_
 
-    Args:
-        species_gdf (gpd.GeoDataFrame, optional): _description_. Defaults to None.
-        features (list, optional): _description_. Defaults to None.
-        prediction_aoi (ee.Geometry, optional): _description_. Defaults to None.
-        model_type (str, optional): _description_. Defaults to "Random Forest".
-        n_trees (int, optional): _description_. Defaults to 100.
-        tree_depth (int, optional): _description_. Defaults to 5.
-        train_size (float, optional): _description_. Defaults to 0.7.
-        year (int, optional): _description_. Defaults to 2024.
+    Parameters
+    ----------
+    presence : gpd.GeoDataFrame, optional
+        _description_, by default None
+    background : gpd.GeoDataFrame, optional
+        _description_, by default None
+    features : list, optional
+        _description_, by default None
+    model_type : str, optional
+        _description_, by default "Random Forest"
+    n_trees : int, optional
+        _description_, by default 100
+    tree_depth : int, optional
+        _description_, by default 5
+    train_size : float, optional
+        _description_, by default 0.7
 
-    Returns:
-        model (): The trained model.
-        results_df (pd.DataFrame): A dataframe with model performance metrics and feature importances.
-        ml_gdf (gpd.GeoDataFrame): Dataframe with presence and absence data.
-        predictors (ee.image): _description_
+    Returns
+    -------
+    _type_
+        _description_
     """
     from sklearn.metrics import r2_score, roc_auc_score
     from sklearn.model_selection import train_test_split, KFold, StratifiedKFold, StratifiedShuffleSplit, cross_val_score, GridSearchCV
@@ -345,7 +483,8 @@ def compute_sdm(presence: gpd.GeoDataFrame=None, background: gpd.GeoDataFrame=No
 
             for i in range(10):
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=train_size, stratify=y, shuffle=True)
-                model = RandomForestClassifier(n_estimators=n_trees, max_samples=0.8, min_samples_leaf=.1, verbose=0, class_weight='balanced', max_depth=tree_depth)
+                model = RandomForestClassifier(n_estimators=n_trees, max_samples=0.8, min_samples_leaf=.1,
+                                               verbose=0, class_weight='balanced', max_depth=tree_depth)
                 model.fit(X_train, y_train)
                 results.append([roc_auc_score(y_test, model.predict_proba(X_test)[:,1])] + model.feature_importances_.tolist())
                 
