@@ -1,5 +1,6 @@
 import math
 import tempfile
+from pathlib import Path
 import json
 import random
 import requests
@@ -309,10 +310,10 @@ def remove_duplicates(data, grain_size, aoi):
     return rand_point_vals.distinct("random")
 
 def get_aoi_from_nuts(country_code:str = "AT", county_name:str=None):
-    NUTS_0 = gpd.read_file(
-        r"../assets/NUTS_RG_01M_2024_4326_LEVL_0.geojson")
-    NUTS_2 = gpd.read_file(
-        r"../assets/NUTS_RG_01M_2024_4326_LEVL_2.geojson")
+    base = Path(__file__).resolve().parent.parent
+    assets = base / "assets"
+    NUTS_0 = gpd.read_file(assets / r"NUTS_RG_01M_2024_4326_LEVL_0.geojson")
+    NUTS_2 = gpd.read_file(assets / r"NUTS_RG_01M_2024_4326_LEVL_2.geojson")
     country = geemap.gdf_to_ee(
         NUTS_0.loc[NUTS_0.CNTR_CODE == country_code])
     if county_name:
@@ -406,7 +407,7 @@ def plot_correlation_heatmap(dataframe, h_size=10, show_labels=False):
     plt.show()
 
 @st.cache_data
-def load_background_data(path=r"../assets/background_data.csv"):
+def load_background_data():
     """Loads background data from file.
     The file is expected to be a CSV with a '.geo' column containing geometries in GeoJSON format.
 
@@ -416,6 +417,8 @@ def load_background_data(path=r"../assets/background_data.csv"):
     Returns:
         gpd.GeoDataFrame: Returns a GeoDataFrame containing the background data.
     """
+    base = Path(__file__).resolve().parent.parent
+    path = base / "assets/background_data.csv"
     bg_df = pd.read_csv(path, sep=',')
     s = bg_df['.geo'].astype(str).str.replace("'", '"').apply(json.loads)
     geoms = s.apply(shapely.geometry.shape)
