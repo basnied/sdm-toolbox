@@ -309,7 +309,8 @@ def remove_duplicates(data, grain_size, aoi):
     )
     return rand_point_vals.distinct("random")
 
-def get_aoi_from_nuts(country_code:str = "AT", county_name:str=None):
+
+def get_aoi_from_nuts(country_code: str = "AT", county_name: str = None):
     base = Path(__file__).resolve().parent.parent
     assets = base / "assets"
     NUTS_0 = gpd.read_file(assets / r"NUTS_RG_01M_2024_4326_LEVL_0.geojson")
@@ -321,7 +322,7 @@ def get_aoi_from_nuts(country_code:str = "AT", county_name:str=None):
             NUTS_2.loc[NUTS_2.NUTS_NAME == county_name])  
     else:
         county = None
-    
+
     return country, county
 
 def get_layer_information(year: int):
@@ -334,32 +335,33 @@ def get_layer_information(year: int):
     terrain = ee.Algorithms.Terrain(ee.Image("USGS/SRTMGL1_003"))
     canopyHeight = ee.ImageCollection("projects/sat-io/open-datasets/facebook/meta-canopy-height").mosaic()
     layer= {
-            "landcover" : ee.Image("COPERNICUS/CORINE/V20/100m/2018").select('landcover'),
-            "elevation" : ee.Image("USGS/SRTMGL1_003").select('elevation'),
-            "slope" : terrain.select('slope'),
-            "aspect" : terrain.select('aspect'),
-            "northness" : terrain.select('aspect').multiply(math.pi/180).cos().rename('northness'),
-            "eastness" : terrain.select('aspect').multiply(math.pi/180).sin().rename('eastness'),
-            "NDVI" : (
+            "landcover": ee.Image("COPERNICUS/CORINE/V20/100m/2018").select('landcover'),
+            "elevation": ee.Image("USGS/SRTMGL1_003").select('elevation'),
+            "slope": terrain.select('slope'),
+            "aspect": terrain.select('aspect'),
+            "northness": terrain.select('aspect').multiply(math.pi/180).cos().rename('northness'),
+            "eastness": terrain.select('aspect').multiply(math.pi/180).sin().rename('eastness'),
+            "NDVI": (
                     ee.ImageCollection('LANDSAT/COMPOSITES/C02/T1_L2_8DAY_NDVI')
                     .filterDate(f"{year}-01-01", f"{year+1}-01-01")
                     .mean()
                 ),
-            "GHMI" : ee.ImageCollection("projects/sat-io/open-datasets/GHM/HM_2022_300M").first().rename('GHMI'),
-            "Trees" : canopyHeight.updateMask(canopyHeight.gte(1)).rename('Trees'),
-            "SWE" : era5.select(['snow_depth_water_equivalent'], ['swe']).mean().rename('SWE'),
-            "snow_depth" : era5.select(['snow_depth'], ['snow_depth']).mean(),
-            "snow_cover" : era5.select(['snow_cover'], ['snow_cover']).mean(),
-            "snow_albedo" : era5.select(['snow_albedo'], ['snow_albedo']).mean(),
-            "CHM" : canopyHeight.rename('CHM'),
-            "NARI" : gee_calculate_scrub_index('nari', year).rename('NARI'),
-            "NCRI" : gee_calculate_scrub_index('ncri', year).rename('NCRI')
+            "GHMI": ee.ImageCollection("projects/sat-io/open-datasets/GHM/HM_2022_300M").first().rename('GHMI'),
+            "Trees": canopyHeight.updateMask(canopyHeight.gte(1)).rename('Trees'),
+            "SWE": era5.select(['snow_depth_water_equivalent'], ['swe']).mean().rename('SWE'),
+            "snow_depth": era5.select(['snow_depth'], ['snow_depth']).mean(),
+            "snow_cover": era5.select(['snow_cover'], ['snow_cover']).mean(),
+            "snow_albedo": era5.select(['snow_albedo'], ['snow_albedo']).mean(),
+            "CHM": canopyHeight.rename('CHM'),
+            "NARI": gee_calculate_scrub_index('nari', year).rename('NARI'),
+            "NCRI": gee_calculate_scrub_index('ncri', year).rename('NCRI')
         }
     return {**layer, **BIOCLIM}
 
+
 def get_layer_visualization_params(layer_name: str):
     try:
-        paletteHM = ['#4c6100','#adda25','#e2ff9b','#ffff73','#ffe629','#ffd37f','#ffaa00','#e69808','#e60000','#a80000','#730000']
+        paletteHM = ['#4c6100', '#adda25', '#e2ff9b', '#ffff73', '#ffe629', '#ffd37f', '#ffaa00', '#e69808', '#e60000', '#a80000', '#730000']
         paletteTrees = ["#4A2354", '#fde725']
         vis_params = {
             "elevation": {"min": 0, "max": 4000, "palette": geemap.colormaps.palettes['terrain']},
@@ -382,6 +384,7 @@ def get_layer_visualization_params(layer_name: str):
         return vis_params.get(layer_name, {})
     except:
         return {}
+
 
 def plot_correlation_heatmap(dataframe, h_size=10, show_labels=False):
     # Calculate Spearman correlation coefficients
@@ -406,6 +409,7 @@ def plot_correlation_heatmap(dataframe, h_size=10, show_labels=False):
     plt.savefig('correlation_heatmap_plot.png')
     plt.show()
 
+
 @st.cache_data
 def load_background_data():
     """Loads background data from file.
@@ -423,19 +427,21 @@ def load_background_data():
     s = bg_df['.geo'].astype(str).str.replace("'", '"').apply(json.loads)
     geoms = s.apply(shapely.geometry.shape)
     bg_gdf = gpd.GeoDataFrame(bg_df.drop(['.geo'], axis=1), geometry=geoms, crs='epsg:4326')
-    
+
     return bg_gdf
 
+
 @st.cache_data
-def get_species_features(_species_gdf: gpd.GeoDataFrame=None, features: list=None, _layer: dict=None):
+def get_species_features(_species_gdf: gpd.GeoDataFrame = None, features: list = None, _layer: dict = None):
     if _layer is None and features is None:
         raise ValueError(" 'layer' and 'features' must be provided.")
     else:
         predictors = ee.Image.cat([_layer[feature] for feature in features])
         presence_gdf = geemap.ee_to_gdf(predictors.sampleRegions(collection=geemap.gdf_to_ee(_species_gdf), geometries=True))
         return presence_gdf, predictors
-    
-def compute_sdm(presence: gpd.GeoDataFrame=None, background: gpd.GeoDataFrame=None, features: list=None, model_type: str="Random Forest", n_trees: int=100, tree_depth: int=5, train_size: float=0.7):
+
+
+def compute_sdm(presence: gpd.GeoDataFrame = None, background: gpd.GeoDataFrame = None, features: list = None, model_type: str = "Random Forest", n_trees: int = 100, tree_depth: int = 5, train_size: float = 0.7):
     """_summary_
 
     Parameters
@@ -479,7 +485,7 @@ def compute_sdm(presence: gpd.GeoDataFrame=None, background: gpd.GeoDataFrame=No
 
     y = ml_gdf['PresAbs']
     X = ml_gdf[features]
-   
+
     match model_type:
         case "Random Forest":
             results = []
@@ -490,7 +496,7 @@ def compute_sdm(presence: gpd.GeoDataFrame=None, background: gpd.GeoDataFrame=No
                                                verbose=0, class_weight='balanced', max_depth=tree_depth)
                 model.fit(X_train, y_train)
                 results.append([roc_auc_score(y_test, model.predict_proba(X_test)[:,1])] + model.feature_importances_.tolist())
-                
+
                 results_df = pd.DataFrame(results, columns=['roc_auc'] + X.columns.tolist())
         case "Maxent":
             model = "Maxent"
@@ -519,11 +525,12 @@ def compute_sdm(presence: gpd.GeoDataFrame=None, background: gpd.GeoDataFrame=No
     # )
     return model, results_df, ml_gdf
 
+
 def classify_image_aoi(image, aoi, ml_gdf, model, features):
     # if "classified_img_pr" in st.session_state:
     #     del st.session_state.classified_img_pr
     fc = geemap.gdf_to_ee(ml_gdf)
-    seed=random.randint(1,1000)
+    seed = random.randint(1, 1000)
     tr_presence_points = fc.filter(ee.Filter.eq('PresAbs', 1)).randomColumn(seed=seed).sort("random")
     tr_pseudo_abs_points = fc.filter(ee.Filter.eq('PresAbs', 0)).randomColumn(seed=seed).sort("random").limit(tr_presence_points.size().getInfo())
     train_pvals = tr_presence_points.merge(tr_pseudo_abs_points)
@@ -535,18 +542,18 @@ def classify_image_aoi(image, aoi, ml_gdf, model, features):
             maxNodes=model.max_depth,
             # shrinkage=0.1, # gradient
             # variablesPerSplit=None,
-            minLeafPopulation=round(train_pvals.size().getInfo()*.1, 0),#rf
-            bagFraction=0.8, # rf
+            minLeafPopulation=round(train_pvals.size().getInfo()*.1, 0),  # rf
+            bagFraction=0.8,  # rf
         )
         classifier_pr = classifier.setOutputMode("PROBABILITY").train(
             train_pvals, "PresAbs", features
         )
         classified_img_pr = image.reproject(crs='EPSG:4326', scale=30).clip(aoi).classify(classifier_pr)
         return classified_img_pr
-       
+
     if model == "Maxent":
         classifier = ee.Classifier.amnhMaxent()
-    
+
         # Presence probability: Habitat suitability map
         classifier_pr = classifier.train(
             train_pvals, "PresAbs", features
@@ -556,12 +563,12 @@ def classify_image_aoi(image, aoi, ml_gdf, model, features):
     if model == "Embedding":
         embeddings = ee.ImageCollection('GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL');
         mosaic = (embeddings
-                .filter(ee.Filter.date('2024-01-01', '2025-01-01'))
-                .mosaic())
+                  .filter(ee.Filter.date('2024-01-01', '2025-01-01'))
+                  .mosaic())
         sampleEmbeddings = mosaic.sampleRegions(
-                collection= geemap.gdf_to_ee(ml_gdf),
-                properties = ['PresAbs'],
-                scale= 30
+                collection=geemap.gdf_to_ee(ml_gdf),
+                properties=['PresAbs'],
+                scale=30
             )
         tr_presence_points = sampleEmbeddings.filter(ee.Filter.eq('PresAbs', 1))
         tr_pseudo_abs_points = sampleEmbeddings.filter(ee.Filter.eq('PresAbs', 0))
@@ -574,8 +581,8 @@ def classify_image_aoi(image, aoi, ml_gdf, model, features):
             maxNodes=5,
             # shrinkage=0.1, # gradient
             # variablesPerSplit=None,
-            minLeafPopulation=round(train_pvals.size().getInfo()*.1, 0),#rf
-            bagFraction=0.8, # rf
+            minLeafPopulation=round(train_pvals.size().getInfo()*.1, 0),  # rf
+            bagFraction=0.8,  # rf
         )
         # Presence probability: Habitat suitability map
         classifier_pr = classifier.setOutputMode("PROBABILITY").train(
@@ -584,14 +591,14 @@ def classify_image_aoi(image, aoi, ml_gdf, model, features):
         classified_img_pr = mosaic.clip(aoi).classify(classifier_pr)
         return classified_img_pr
 
-    
+
 def plot_hier_clustering(dataframe):
     from scipy.cluster import hierarchy
     from scipy.spatial.distance import squareform
     from scipy.stats import spearmanr
     from collections import defaultdict
-    
-    X=dataframe.copy().drop('geometry', axis=1)
+
+    X = dataframe.copy().drop('geometry', axis=1)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 8))
     corr = spearmanr(X).correlation
 
