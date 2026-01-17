@@ -11,7 +11,29 @@ from sklearn.ensemble import RandomForestClassifier
 import matplotlib.pyplot as plt
 import numpy as np
 import ee
+import matplotlib
 
+from sklearn.inspection import permutation_importance
+from sklearn.utils.fixes import parse_version
+
+
+def plot_permutation_importance(clf, X, y, ax):
+    result = permutation_importance(clf, X, y, n_repeats=100, random_state=42, n_jobs=2)
+    perm_sorted_idx = result.importances_mean.argsort()
+    translation_dict = {f'b{i+1}':f'BIO{(i+1):02d}' for i in range(19)} | {'elevation':'Geländehöhe', 'slope':'Hangneigung', 'aspect':'Exposition', 'landcover':'CLC', 'snow_cover':'Schneebedeckung', 'snow_depth':'Schneetiefe'}
+    # `labels` argument in boxplot is deprecated in matplotlib 3.9 and has been
+    # renamed to `tick_labels`. The following code handles this, but as a
+    # scikit-learn user you probably can write simpler code by using `labels=...`
+    # (matplotlib < 3.9) or `tick_labels=...` (matplotlib >= 3.9).
+    tick_labels_parameter_name = (
+        "tick_labels"
+        if parse_version(matplotlib.__version__) >= parse_version("3.9")
+        else "labels"
+    )
+    tick_labels_dict = {tick_labels_parameter_name: [translation_dict.get(key) if key in translation_dict.keys() else key for key in X.columns[perm_sorted_idx].tolist()]}
+    ax.boxplot(result.importances[perm_sorted_idx].T, vert=False, **tick_labels_dict)
+    ax.axvline(x=0, color="k", linestyle="--")
+    return ax
 
 def mask_s2_clouds(image):
     """Masks clouds in a Sentinel-2 image using the QA band.
@@ -435,11 +457,14 @@ def compute_sdm(presence: gpd.GeoDataFrame=None, background: gpd.GeoDataFrame=No
     from sklearn.metrics import r2_score, roc_auc_score
     from sklearn.model_selection import train_test_split, KFold, StratifiedKFold, StratifiedShuffleSplit, cross_val_score, GridSearchCV
     from sklearn.feature_selection import RFE, RFECV, SelectFromModel
-    
+    from sklearn.inspection import PartialDependenceDisplay, permutation_importance
+
     # if model_type== "Maxent" & (backgrund_gdf is None):
     #     background_gdf = load_background_data()[features+['geometry']]
     # else:
     #     background_gdf = load_background_data()[features+['geometry']].sample(n=species_gdf.shape[0], axis=0)
+    translation_dict = {f'b{i+1}':f'BIO{(i+1):02d}' for i in range(19)} | {'elevation':'Geländehöhe', 'slope':'Hangneigung', 'aspect':'Exposition', 'landcover':'CLC', 'snow_cover':'Schneebedeckung', 'snow_depth':'Schneetiefe'}
+
     background = background[features+['geometry']].copy().sample(n=presence.shape[0], axis=0)
 
     background['PresAbs'] = 0
@@ -451,7 +476,7 @@ def compute_sdm(presence: gpd.GeoDataFrame=None, background: gpd.GeoDataFrame=No
 
     y = ml_gdf['PresAbs']
     X = ml_gdf[features]
-   
+
     match model_type:
         case "Random Forest":
             results = []
@@ -462,8 +487,22 @@ def compute_sdm(presence: gpd.GeoDataFrame=None, background: gpd.GeoDataFrame=No
                                                verbose=0, class_weight='balanced', max_depth=tree_depth)
                 model.fit(X_train, y_train)
                 results.append([roc_auc_score(y_test, model.predict_proba(X_test)[:,1])] + model.feature_importances_.tolist())
-                
+
                 results_df = pd.DataFrame(results, columns=['roc_auc'] + X.columns.tolist())
+
+            mdi_importances = pd.Series(model.feature_importances_, index=[translation_dict.get(key) if key in translation_dict.keys() else key for key in X[features].columns.tolist()])
+            tree_importance_sorted_idx = np.argsort(model.feature_importances_)
+
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 8), dpi=500)
+            mdi_importances.sort_values().plot.barh(ax=ax1)
+            ax1.set_xlabel("Gini importance")
+            plot_permutation_importance(model, X_test[features], y_test, ax2)
+            ax2.set_xlabel("Verringerung der Korrektklassifikationsrate")
+            fig.suptitle(
+                "Impurity-based vs. Permutation Importances bei multikollinearen Features"
+            )
+            _ = fig.tight_layout()
+
         case "Maxent":
             model = "Maxent"
             results_df = pd.DataFrame()
@@ -491,11 +530,12 @@ def compute_sdm(presence: gpd.GeoDataFrame=None, background: gpd.GeoDataFrame=No
     # )
     return model, results_df, ml_gdf
 
+
 def classify_image_aoi(image, aoi, ml_gdf, model, features):
     # if "classified_img_pr" in st.session_state:
     #     del st.session_state.classified_img_pr
     fc = geemap.gdf_to_ee(ml_gdf)
-    seed=random.randint(1,1000)
+    seed = random.randint(1, 1000)
     tr_presence_points = fc.filter(ee.Filter.eq('PresAbs', 1)).randomColumn(seed=seed).sort("random")
     tr_pseudo_abs_points = fc.filter(ee.Filter.eq('PresAbs', 0)).randomColumn(seed=seed).sort("random").limit(tr_presence_points.size().getInfo())
     train_pvals = tr_presence_points.merge(tr_pseudo_abs_points)
@@ -507,8 +547,8 @@ def classify_image_aoi(image, aoi, ml_gdf, model, features):
             maxNodes=model.max_depth,
             # shrinkage=0.1, # gradient
             # variablesPerSplit=None,
-            minLeafPopulation=round(train_pvals.size().getInfo()*.1, 0),#rf
-            bagFraction=0.8, # rf
+            minLeafPopulation=round(train_pvals.size().getInfo()*.1, 0),  # rf
+            bagFraction=0.8,  # rf
         )
         classifier_pr = classifier.setOutputMode("PROBABILITY").train(
             train_pvals, "PresAbs", features
@@ -531,9 +571,9 @@ def classify_image_aoi(image, aoi, ml_gdf, model, features):
                 .filter(ee.Filter.date('2024-01-01', '2025-01-01'))
                 .mosaic())
         sampleEmbeddings = mosaic.sampleRegions(
-                collection= geemap.gdf_to_ee(ml_gdf),
-                properties = ['PresAbs'],
-                scale= 30
+                collection=geemap.gdf_to_ee(ml_gdf),
+                properties=['PresAbs'],
+                scale=30
             )
         tr_presence_points = sampleEmbeddings.filter(ee.Filter.eq('PresAbs', 1))
         tr_pseudo_abs_points = sampleEmbeddings.filter(ee.Filter.eq('PresAbs', 0))
@@ -556,14 +596,14 @@ def classify_image_aoi(image, aoi, ml_gdf, model, features):
         classified_img_pr = mosaic.clip(aoi).classify(classifier_pr)
         return classified_img_pr
 
-    
+
 def plot_hier_clustering(dataframe):
     from scipy.cluster import hierarchy
     from scipy.spatial.distance import squareform
     from scipy.stats import spearmanr
     from collections import defaultdict
-    
-    X=dataframe.copy().drop('geometry', axis=1)
+
+    X = dataframe.copy().drop('geometry', axis=1)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 8))
     corr = spearmanr(X).correlation
 
@@ -586,7 +626,7 @@ def plot_hier_clustering(dataframe):
     ax2.set_xticklabels(dendro["ivl"], rotation="vertical")
     ax2.set_yticklabels(dendro["ivl"])
     _ = fig.tight_layout()
-    
+
     cluster_ids = hierarchy.fcluster(dist_linkage, .35, criterion="distance")
     cluster_id_to_feature_ids = defaultdict(list)
     for idx, cluster_id in enumerate(cluster_ids):
@@ -594,9 +634,9 @@ def plot_hier_clustering(dataframe):
     selected_features = [v[0] for v in cluster_id_to_feature_ids.values()]
     selected_features_names = X.columns[selected_features]
     selected_features_names
-    
-    
+
     return fig, selected_features_names
+
 
 def get_index_info():
     index_info = {
@@ -608,8 +648,9 @@ def get_index_info():
         "CHM": "Canopy Height Model (CHM) stellt die Höhe der Vegetationsdecke über dem Boden dar und wird durch die Differenz zwischen dem Digitalen Oberflächenmodell (DOM) und dem Digitalen Geländemodell (DGM) berechnet:   $CHM = DOM - DGM$.",
         "Trees": "Abwandlung des CHM, welche nur Baumhöhen über 1 Meter berücksichtigt und in trees (1) und no-trees (0) klassifiziert.",
     }
-    
+
     return index_info
+
 
 def load_map_layer(layers, country_code):
     Map = geemap.foliumap.Map()
@@ -623,5 +664,5 @@ def load_map_layer(layers, country_code):
                          {'palette': 'FF0000'}, "Country AOI",
                          opacity=1)
             Map.centerObject(st.session_state.country_aoi, 6)
-        
+
     return Map
