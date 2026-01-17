@@ -91,7 +91,7 @@ with sdm_tab:
                     st.multiselect(
                         "Select Environmental Features",
                         options=list(st.session_state.layer.keys()),
-                        default=['NDVI', 'aspect', 'b1', 'b12', 'CHM', 'GHMI', 'NARI', 'northness'],
+                        default=['landcover', 'NDVI', 'CHM', 'b1', 'b12'],
                         key="features_select"
                     )
                     
