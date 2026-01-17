@@ -137,13 +137,13 @@ with sdm_tab:
             if "index_select" in st.session_state:
                 st.markdown(st.session_state.index_info.get(st.session_state.index_select, "No information available for this index."))       
         create_index_info()
-    
+
     with st.expander("Map View", expanded=True):
         @st.fragment
         def create_map():
             if "country_input" in st.session_state:
                 Map = load_map_layer(st.session_state.layers_select, st.session_state.country_input)
-                
+
                 if st.button(f"Classify {st.session_state.county_input} Layer") and "model" in st.session_state:
                     with st.spinner("Classifying image..."):
                         if "model" in st.session_state:
@@ -166,17 +166,17 @@ with sdm_tab:
                     position="bottomright",
                     layer_name="Habitat suitability")
                     Map.addLayer(geemap.gdf_to_ee(st.session_state.ml_gdf[st.session_state.ml_gdf.PresAbs==0]), {'color':'orange'}, "Used background data points", shown=False)
-                    if st.button(label="Download Prediction GeoTIFF"):
-                        geemap.ee_export_image(
-                            ee_object=st.session_state.classified_img_pr,
-                            region=st.session_state.classified_img_pr.geometry(),
-                            scale=90,
-                            filename=Path.home() / f'Downloads/SDM_Prediction_{st.session_state.species_input}_{st.session_state.county_input}_{st.session_state.year_input}.tif'
-                        )                    
+                    # if st.button(label="Download Prediction GeoTIFF"):
+                    #     geemap.ee_export_image(
+                    #         ee_object=st.session_state.classified_img_pr,
+                    #         region=st.session_state.classified_img_pr.geometry(),
+                    #         scale=90,
+                    #         filename=Path.home() / f'Downloads/SDM_Prediction_{st.session_state.species_input}_{st.session_state.county_input}_{st.session_state.year_input}.tif'
+                    #     )                    
                 if st.session_state.species_gdf is not None:
                     Map.addLayer(geemap.gdf_to_ee(st.session_state.species_gdf), {'color':'red'}, f"Species Observations {st.session_state.species_input}", shown=True)
                     Map.addLayer(geemap.gdf_to_ee(st.session_state.background_gdf), {'color':'blue'}, "Background data", shown=False)
-                
+
                 Map.to_streamlit()
         create_map()
 
