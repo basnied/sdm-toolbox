@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Nied
+    given-names: Sebastian
+    orcid: https://orcid.org/0009-0007-5860-2038
+title: "sdm-toolbox. A simple workflow for species distribution models."
+version: 0.1.0
+date-released: 2026-01-01
