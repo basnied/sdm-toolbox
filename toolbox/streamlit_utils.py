@@ -24,7 +24,6 @@ def initialize_gee():
     try:
         service_account_info = os.environ["earthengine"]
         credentials = ee.ServiceAccountCredentials(
-            email=service_account_info["client_email"],
             key_data=service_account_info
         )
         st.write(credentials)
