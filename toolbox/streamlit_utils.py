@@ -30,7 +30,7 @@ def initialize_gee():
         st.write(json.dumps(service_account_info))
         credentials = ee.ServiceAccountCredentials(
             email=service_account_info["client_email"],
-            key_data=json.dumps(service_account_info)
+            key_data=json.dumps(service_account_info).replace("\\n", "\n")
         )
         st.write(credentials)
         ee.Initialize(credentials, project=credentials.project_id)
