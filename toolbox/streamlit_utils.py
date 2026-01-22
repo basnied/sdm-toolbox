@@ -22,15 +22,10 @@ def initialize_gee():
     for web app.
     """
     try:
-        raw = os.environ["earthengine"]   # Posit variable (already JSON string)
-        service_account_info = json.loads(raw)
-
-        service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
-
-        st.write(json.dumps(service_account_info))
+        service_account_info = os.environ["earthengine"]
         credentials = ee.ServiceAccountCredentials(
             email=service_account_info["client_email"],
-            key_data=json.dumps(service_account_info).replace("\\n", "\n")
+            key_data=service_account_info
         )
         st.write(credentials)
         ee.Initialize(credentials, project=credentials.project_id)
