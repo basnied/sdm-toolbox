@@ -24,7 +24,7 @@ def initialize_gee():
     try:
         service_account_info = json.loads(os.environ["earthengine"], strict=False)
         credentials = ee.ServiceAccountCredentials(
-                service_account_info["client_email"], json.dumps(service_account_info))
+                email=service_account_info["client_email"], key_data=json.dumps(service_account_info))
         ee.Initialize(credentials, project=credentials.project_id)
     except Exception as e:
         st.error("Error when intializing Google Earth Engine. \
