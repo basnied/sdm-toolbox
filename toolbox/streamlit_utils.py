@@ -27,7 +27,6 @@ def initialize_gee():
             email="streamlit-sdm@ee-sebasd1991.iam.gserviceaccount.com",
             key_data=service_account_info
         )
-        st.write(credentials)
         ee.Initialize(credentials, project=credentials.project_id)
     except Exception as e:
         st.error("Error when intializing Google Earth Engine. \
