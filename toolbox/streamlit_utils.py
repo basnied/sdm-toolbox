@@ -25,7 +25,7 @@ def initialize_gee():
         service_account_info = json.loads(os.environ["earthengine"], strict=False)
         credentials = ee.ServiceAccountCredentials(
             email=service_account_info["client_email"],
-            key_data=json.dumps(service_account_info)['private_key']
+            key_data=json.dumps(service_account_info).replace('"', r'\"')
         )
         ee.Initialize(credentials, project=credentials.project_id)
     except Exception as e:
