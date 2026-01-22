@@ -21,10 +21,8 @@ def initialize_gee():
     """Intitialize Google Earth Engine with service account credentials
     for web app.
     """
-    st.write(os.environ["earthengine"])
     try:
-        st.write(os.environ["earthengine"])
-        service_account_info = dict(os.environ["earthengine"])
+        service_account_info = os.environ["earthengine"]
         with tempfile.NamedTemporaryFile(
                 mode='w+', suffix='.json', delete=False) as f:
             json.dump(service_account_info, f)
