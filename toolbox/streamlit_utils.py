@@ -22,10 +22,10 @@ def initialize_gee():
     for web app.
     """
     try:
-        service_account_info = os.environ["earthengine"]
+        service_account_info = json.loads(os.environ["earthengine"], strict=False)
         credentials = ee.ServiceAccountCredentials(
-            email="streamlit-sdm@ee-sebasd1991.iam.gserviceaccount.com",
-            key_data=service_account_info
+            email=service_account_info["client_email"],
+            key_data=json.dumps(service_account_info).replace("\\n", "\n")
         )
         ee.Initialize(credentials, project=credentials.project_id)
     except Exception as e:
