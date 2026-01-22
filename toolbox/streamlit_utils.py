@@ -22,6 +22,7 @@ def initialize_gee():
     for web app.
     """
     try:
+        print(os.environ["earthengine"])
         service_account_info = dict(os.environ["earthengine"])
         with tempfile.NamedTemporaryFile(
                 mode='w+', suffix='.json', delete=False) as f:
