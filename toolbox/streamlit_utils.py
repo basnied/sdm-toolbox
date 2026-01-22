@@ -14,7 +14,6 @@ from sklearn.ensemble import RandomForestClassifier
 import matplotlib.pyplot as plt
 import numpy as np
 import ee
-import base64
 
 
 @st.cache_resource
@@ -23,9 +22,10 @@ def initialize_gee():
     for web app.
     """
     try:
-        encoded = os.environ["earthengine"]
-        decoded = base64.b64decode(encoded).decode("utf-8")
-        service_account_info = json.loads(decoded)
+        raw = os.environ["earthengine"]   # Posit variable (already JSON string)
+        service_account_info = json.loads(raw)
+
+        service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
 
         st.write(json.dumps(service_account_info))
         credentials = ee.ServiceAccountCredentials(
