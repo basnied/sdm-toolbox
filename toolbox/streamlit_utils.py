@@ -1,3 +1,4 @@
+import os
 import math
 import tempfile
 from pathlib import Path
@@ -21,7 +22,7 @@ def initialize_gee():
     for web app.
     """
     try:
-        service_account_info = dict(st.secrets["earthengine"])
+        service_account_info = dict(os.environ["earthengine"])
         with tempfile.NamedTemporaryFile(
                 mode='w+', suffix='.json', delete=False) as f:
             json.dump(service_account_info, f)
