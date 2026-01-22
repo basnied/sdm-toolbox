@@ -24,6 +24,7 @@ def initialize_gee():
     try:
         service_account_info = os.environ["earthengine"]
         credentials = ee.ServiceAccountCredentials(
+            email="streamlit-sdm@ee-sebasd1991.iam.gserviceaccount.com",
             key_data=service_account_info
         )
         st.write(credentials)
