@@ -18,9 +18,13 @@ from sklearn.utils.fixes import parse_version
 
 
 def plot_permutation_importance(clf, X, y, ax):
-    result = permutation_importance(clf, X, y, n_repeats=100, random_state=42, n_jobs=2)
+    result = permutation_importance(clf, X, y, n_repeats=100,
+                                    random_state=42, n_jobs=2)
     perm_sorted_idx = result.importances_mean.argsort()
-    translation_dict = {f'b{i+1}':f'BIO{(i+1):02d}' for i in range(19)} | {'elevation':'Geländehöhe', 'slope':'Hangneigung', 'aspect':'Exposition', 'landcover':'CLC', 'snow_cover':'Schneebedeckung', 'snow_depth':'Schneetiefe'}
+    translation_dict = {f'b{i+1}': f'BIO{(i+1):02d}' for i in range(19)} |\
+        {'elevation': 'Geländehöhe', 'slope': 'Hangneigung',
+         'aspect': 'Exposition', 'landcover': 'CLC',
+         'snow_cover': 'Schneebedeckung', 'snow_depth': 'Schneetiefe'}
     # `labels` argument in boxplot is deprecated in matplotlib 3.9 and has been
     # renamed to `tick_labels`. The following code handles this, but as a
     # scikit-learn user you probably can write simpler code by using `labels=...`
@@ -30,10 +34,13 @@ def plot_permutation_importance(clf, X, y, ax):
         if parse_version(matplotlib.__version__) >= parse_version("3.9")
         else "labels"
     )
-    tick_labels_dict = {tick_labels_parameter_name: [translation_dict.get(key) if key in translation_dict.keys() else key for key in X.columns[perm_sorted_idx].tolist()]}
+    tick_labels_dict = {tick_labels_parameter_name: [translation_dict.get(key)
+                        if key in translation_dict.keys() else key
+                        for key in X.columns[perm_sorted_idx].tolist()]}
     ax.boxplot(result.importances[perm_sorted_idx].T, vert=False, **tick_labels_dict)
     ax.axvline(x=0, color="k", linestyle="--")
     return ax
+
 
 def mask_s2_clouds(image):
     """Masks clouds in a Sentinel-2 image using the QA band.
@@ -242,7 +249,7 @@ def get_species_data(species_name, country_code, database: str = 'gbif'):
         pd.DataFrame
             A pandas DataFrame containing the observational data.
     """
-    if(database == 'iNaturalist'):
+    if database == 'iNaturalist':
         user_id = input('Type in User-ID: ')
 
     match database:
@@ -269,8 +276,10 @@ def get_species_data(species_name, country_code, database: str = 'gbif'):
             df = pd.json_normalize(occurrences)
             return gpd.GeoDataFrame(
                 df,
-                geometry=gpd.points_from_xy(df.decimalLongitude,
-                    df.decimalLatitude), crs="EPSG:4326"
+                geometry=gpd.points_from_xy(
+                    df.decimalLongitude,
+                    df.decimalLatitude),
+                crs="EPSG:4326"
                 )[["species", "year", "month", "geometry"]]
         else:
             print("No data found for the given species"
@@ -278,9 +287,9 @@ def get_species_data(species_name, country_code, database: str = 'gbif'):
             return None
     except requests.RequestException as e:
         print(f"Request failed: {e}")
-        return None  
+        return None
 
- 
+
 def remove_duplicates(data, grain_size, aoi):
     """Remove duplicate georefernced points from data within
     an Area of Interest and a given resolution.
@@ -307,7 +316,8 @@ def remove_duplicates(data, grain_size, aoi):
     )
     return rand_point_vals.distinct("random")
 
-def get_aoi_from_nuts(country_code:str = "AT", county_name:str=None):
+
+def get_aoi_from_nuts(country_code: str = "AT", county_name: str=None):
     NUTS_0 = gpd.read_file(
         r"./assets/NUTS_RG_01M_2024_4326_LEVL_0.geojson")
     NUTS_2 = gpd.read_file(
@@ -316,11 +326,12 @@ def get_aoi_from_nuts(country_code:str = "AT", county_name:str=None):
         NUTS_0.loc[NUTS_0.CNTR_CODE == country_code])
     if county_name:
         county = geemap.gdf_to_ee(
-            NUTS_2.loc[NUTS_2.NUTS_NAME == county_name])  
+            NUTS_2.loc[NUTS_2.NUTS_NAME == county_name])
     else:
         county = None
-    
+
     return country, county
+
 
 def get_layer_information(year: int):
     era5 = (
@@ -355,6 +366,7 @@ def get_layer_information(year: int):
         }
     return {**layer, **BIOCLIM}
 
+
 def get_layer_visualization_params(layer_name: str):
     try:
         paletteHM = ['#4c6100','#adda25','#e2ff9b','#ffff73','#ffe629','#ffd37f','#ffaa00','#e69808','#e60000','#a80000','#730000']
@@ -381,6 +393,7 @@ def get_layer_visualization_params(layer_name: str):
     except:
         return {}
 
+
 def plot_correlation_heatmap(dataframe, h_size=10, show_labels=False):
     # Calculate Spearman correlation coefficients
     correlation_matrix = dataframe.corr(method="spearman")
@@ -404,6 +417,7 @@ def plot_correlation_heatmap(dataframe, h_size=10, show_labels=False):
     plt.savefig('correlation_heatmap_plot.png')
     plt.show()
 
+
 def load_background_data(path=r"./assets/background_data.csv"):
     """Loads background data from file.
     The file is expected to be a CSV with a '.geo' column containing geometries in GeoJSON format.
@@ -418,8 +432,9 @@ def load_background_data(path=r"./assets/background_data.csv"):
     s = bg_df['.geo'].astype(str).str.replace("'", '"').apply(json.loads)
     geoms = s.apply(shapely.geometry.shape)
     bg_gdf = gpd.GeoDataFrame(bg_df.drop(['.geo'], axis=1), geometry=geoms, crs='epsg:4326')
-    
+
     return bg_gdf
+
 
 def get_species_features(_species_gdf: gpd.GeoDataFrame=None, features: list=None, _layer: dict=None):
     if _layer is None and features is None:
@@ -428,7 +443,8 @@ def get_species_features(_species_gdf: gpd.GeoDataFrame=None, features: list=Non
         predictors = ee.Image.cat([_layer[feature] for feature in features])
         presence_gdf = geemap.ee_to_gdf(predictors.sampleRegions(collection=geemap.gdf_to_ee(_species_gdf), geometries=True))
         return presence_gdf, predictors
-    
+
+
 def compute_sdm(presence: gpd.GeoDataFrame=None, background: gpd.GeoDataFrame=None, features: list=None, model_type: str="Random Forest", n_trees: int=100, tree_depth: int=5, train_size: float=0.7):
     """_summary_
 
@@ -468,7 +484,7 @@ def compute_sdm(presence: gpd.GeoDataFrame=None, background: gpd.GeoDataFrame=No
     background = background[features+['geometry']].copy().sample(n=presence.shape[0], axis=0)
 
     background['PresAbs'] = 0
-    presence['PresAbs'] = 1   
+    presence['PresAbs'] = 1
     presence = presence[background.columns]
 
     ml_gdf = pd.concat([background, presence], axis=0).reset_index(drop=True)
@@ -488,7 +504,7 @@ def compute_sdm(presence: gpd.GeoDataFrame=None, background: gpd.GeoDataFrame=No
                 model.fit(X_train, y_train)
                 results.append([roc_auc_score(y_test, model.predict_proba(X_test)[:,1])] + model.feature_importances_.tolist())
 
-                results_df = pd.DataFrame(results, columns=['roc_auc'] + X.columns.tolist())
+            results_df = pd.DataFrame(results, columns=['roc_auc'] + X.columns.tolist())
 
             mdi_importances = pd.Series(model.feature_importances_, index=[translation_dict.get(key) if key in translation_dict.keys() else key for key in X[features].columns.tolist()])
             tree_importance_sorted_idx = np.argsort(model.feature_importances_)
@@ -555,10 +571,10 @@ def classify_image_aoi(image, aoi, ml_gdf, model, features):
         )
         classified_img_pr = image.reproject(crs='EPSG:4326', scale=30).clip(aoi).classify(classifier_pr)
         return classified_img_pr
-       
+
     if model == "Maxent":
         classifier = ee.Classifier.amnhMaxent()
-    
+
         # Presence probability: Habitat suitability map
         classifier_pr = classifier.train(
             train_pvals, "PresAbs", features
@@ -657,7 +673,7 @@ def load_map_layer(layers, country_code):
     Map.add_basemap("SATELLITE")
     for key, value in st.session_state.layer.items():
         if key in layers:
-            Map.addLayer(value.clip(st.session_state.country_aoi), get_layer_visualization_params(key), key, opacity=.5) 
+            Map.addLayer(value.clip(st.session_state.country_aoi), get_layer_visualization_params(key), key, opacity=.5)
             Map.addLayer(ee.Image().byte().paint(
                 featureCollection=st.session_state.country_aoi,
                 color=1, width=2),

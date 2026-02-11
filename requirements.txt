@@ -6,15 +6,16 @@ scikit-learn==1.8.0
 matplotlib==3.10.8
 shapely==2.1.2
 streamlit==1.37.0
-geemap==0.32.0
 earthengine-api==0.1.390
 streamlit-folium==0.18.0
 folium==0.15.1
 xyzservices==2023.10.1
 python-box==7.1.1
 pandas
+statsmodels
 geopandas
 pydeck
 pygbif==0.6.6
+geemap==0.32.0
 
 

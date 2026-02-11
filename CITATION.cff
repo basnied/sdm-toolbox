@@ -5,6 +5,6 @@ authors:
     given-names: Sebastian
     orcid: https://orcid.org/0009-0007-5860-2038
 title: "sdm-toolbox. A simple workflow for species distribution models."
-url: https://github.com/Bas-Jaspert/sdm-toolbox.git
+url: https://github.com/basnied/sdm-toolbox.git
 version: 0.1.0
 date-released: 2026-01-01
