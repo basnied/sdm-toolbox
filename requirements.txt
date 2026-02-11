@@ -1,14 +1,14 @@
 altair<5
-numpy
-pandas
-geopandas
-geemap
-ee
-scipy
-scikit-learn
-matplotlib
-streamlit
-shapely
-
+numpy==2.4.2
+pandas==2.3.3
+geopandas==1.1.2
+geemap==0.37.1
+ee==0.2
+scipy==1.17.0stre
+scikit-learn==1.8.0
+matplotlib==3.10.8
+streamlit==1.54.0
+shapely==2.1.2
+pygbif==0.6.6
 
 

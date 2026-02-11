@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import streamlit as st
 from pathlib import Path
 import geemap
@@ -522,16 +521,3 @@ with faq_tab:
 if __name__ == "__main__":
 
     pass
-
-
-
-
-
-
-
-
-
-
-
-
->>>>>>> cd4666d (.)
