@@ -4,11 +4,11 @@ pandas
 geopandas
 geemap
 ee
-earthengine-api
 scipy
 scikit-learn
 matplotlib
 streamlit
 shapely
+
 
 
