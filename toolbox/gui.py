@@ -1,25 +1,26 @@
 import streamlit as st
 from pathlib import Path
-import geemap
+import geemap.foliumap as geemap
+from streamlit_folium import st_folium
 import pandas as pd
 import geopandas as gpd
 import ee
 import tempfile
 from streamlit_utils import *
 
-@st.cache_data
+# @st.cache_data
 def load_map_layer(layers, country_code):
-    Map = geemap.foliumap.Map()
+    Map = geemap.Map()
     Map.add_basemap("SATELLITE")
     for key, value in st.session_state.layer.items():
         if key in layers:
             Map.addLayer(value.clip(st.session_state.country_aoi), get_layer_visualization_params(key), key, opacity=.5) 
-            Map.addLayer(ee.Image().byte().paint(
-                featureCollection=st.session_state.country_aoi,
-                color=1, width=2),
-                         {'palette': 'FF0000'}, "Country AOI",
-                         opacity=1)
-            Map.centerObject(st.session_state.country_aoi, 6)
+    Map.addLayer(ee.Image().byte().paint(
+        featureCollection=st.session_state.country_aoi,
+        color=1, width=2),
+                    {'palette': 'FF0000'}, "Country AOI",
+                    opacity=1)
+    Map.centerObject(st.session_state.country_aoi, 6)
         
     return Map
 
