@@ -1,7 +1,5 @@
 import streamlit as st
 from pathlib import Path
-from io import StringIO
-import geemap.foliumap
 import geemap
 import pandas as pd
 import geopandas as gpd
